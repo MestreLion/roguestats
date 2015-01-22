@@ -113,14 +113,13 @@ def monster_range(monsterlist):
     return minl, maxl
 
 
-def read_data(fp, cachefile=None):
-    ''' Parse the raw data into 2 dictionaries, wander and level monsters
+def read_file(fp):
+    ''' Parse a data file into 2 dictionaries, wander and level monsters
     '''
     lmonsters = {}
     wmonsters = {}
     monsters = 0
 
-    log.debug("Reading file '%s'", fp.name)
     for i, line in enumerate(fp):
         monsters += len(line) - 1  # discard trailing '\n'
         level = (i // 2) + 1
@@ -146,23 +145,53 @@ def read_data(fp, cachefile=None):
                 monsters={"": list(MONSTERS)},
                 )
 
-    # Save to cache
-    if cachefile is not None:
+    return data
+
+
+def load_data(infile, stdin):
+    ''' Load the data from cache file, if possible,
+        or load from opened infile fp and save it to cache file.
+        if infile is <stdin>, do not try to read or write cache
+    '''
+
+    # Read cache file, if it exists and input is not <stdin>
+    cachefile = os.path.join(xdg_cache_home,
+                             _myname,
+                             "%s_%s.json" % (_myname,
+                                             hashlib.md5(infile.name +
+                                                         str(os.path.getmtime(infile.name))
+                                                         ).hexdigest()))
+    if not stdin:
         try:
-            log.debug("Saving data to cache file '%s'", cachefile)
-            try:
-                os.makedirs(os.path.dirname(cachefile), 0700)
-            except OSError as e:
-                if e.errno != 17:  # File exists
-                    raise
-
-            with open(cachefile, 'w') as fp:
-                intlen = int(math.log10(max(sum(lmonsters.values() +
-                                                wmonsters.values(), [])))) + 1
-                fp.write(pretty(data, intlen=intlen) + '\n')
-
+            with open(cachefile, 'r') as fp:
+                log.debug("Reading data from cache file '%s'", cachefile)
+                return json.load(fp)
         except IOError as e:
-            log.warn("Could not write cache '%s': %s", cachefile, e)
+            if e.errno != 2:  # File not found
+                log.warn("Could not read cache file '%s': %s", cachefile, e)
+
+    # Cache failed. Read from input file
+    log.debug("Reading data from '%s'", infile.name)
+    data = read_file(infile)
+    if stdin:
+        return data
+
+    # Save to cache
+    log.debug("Saving data to cache file '%s'", cachefile)
+    try:
+        try:
+            os.makedirs(os.path.dirname(cachefile), 0700)
+        except OSError as e:
+            if e.errno != 17:  # File exists
+                raise
+
+        with open(cachefile, 'w') as fp:
+            intlen = int(math.log10(max(sum(data["lmonsters"].values() +
+                                            data["wmonsters"].values(), [])))) + 1
+            fp.write(pretty(data, intlen=intlen) + '\n')
+
+    except IOError as e:
+        log.warn("Could not write cache '%s': %s", cachefile, e)
 
     return data
 
@@ -236,22 +265,7 @@ def main(argv=None):
     weights = (abs(args.level_weight),
                abs(args.wander_weight))
 
-    # Read cache file, if available
-    if not args.stdin:
-        cachefile = os.path.join(xdg_cache_home,
-                                 _myname,
-                                 "%s_%s.json" % (_myname,
-                                                 hashlib.md5(args.infile.name +
-                                                             str(os.path.getmtime(args.infile.name))
-                                                             ).hexdigest()))
-        try:
-            with open(cachefile, 'r') as fp:
-                log.debug("Reading from cache file '%s'", cachefile)
-                data = json.load(fp)
-        except IOError:
-            data = read_data(args.infile, cachefile)
-    else:
-        data = read_data(args.infile)
+    data = load_data(args.infile, args.stdin)
 
     levels, monsters = normalize_data(data, weights)
 
