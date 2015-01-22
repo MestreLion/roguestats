@@ -21,7 +21,6 @@
 '''Main module and entry point'''
 
 # Next steps:
-# - cache wander and level separately, calculate weighted sum afterwards
 # - Numpy
 
 import os
@@ -115,26 +114,41 @@ def monster_range(monsterlist):
 
 
 def read_data(fp, cachefile=None):
-    ''' Parse the raw data to the Levels dictionary
+    ''' Parse the raw data into 2 dictionaries, wander and level monsters
     '''
-    levels = {}
-    header = dict(filename=os.path.abspath(fp.name),
-                  weights=weights)
+    lmonsters = {}
+    wmonsters = {}
+    monsters = 0
 
     log.debug("Reading file '%s'", fp.name)
     for i, line in enumerate(fp):
-        l = (i // 2)
-        w = weights[i % 2]
-        levels.setdefault(l+1, len(MONSTERS) * [0])
+        monsters += len(line) - 1  # discard trailing '\n'
+        level = (i // 2) + 1
+        if i % 2 == 0:
+            d = lmonsters
+        else:
+            d = wmonsters
+        d.setdefault(level, len(MONSTERS) * [0])
         for m, monster in enumerate(MONSTERS):
-            levels[l+1][m] += w * line.count(monster)
+            d[level][m] += line.count(monster)
+
+    assert len(lmonsters) == len(wmonsters), "Bad input data"
+
+    lines = i + 1
+    header = dict(filename=os.path.abspath(fp.name),
+                  levels=lines / 2,
+                  monstersperline=monsters / lines,
+                  totalmonsters=monsters)
 
     # Save to cache
     if cachefile is not None:
         try:
             log.debug("Saving data to cache file '%s'", cachefile)
             data = dict(header=header,
-                        levels=levels)
+                        lmonsters=lmonsters,
+                        wmonsters=wmonsters,
+                        monsters={"": list(MONSTERS)},
+                        )
             try:
                 os.makedirs(os.path.dirname(cachefile), 0700)
             except OSError as e:
@@ -142,13 +156,14 @@ def read_data(fp, cachefile=None):
                     raise
 
             with open(cachefile, 'w') as fp:
-                intlen = int(math.log10(max(sum(levels.values(), [])))) + 1
+                intlen = int(math.log10(max(sum(lmonsters.values() +
+                                                wmonsters.values(), [])))) + 1
                 fp.write(pretty(data, intlen=intlen) + '\n')
 
         except IOError as e:
             log.warn("Could not write cache '%s': %s", cachefile, e)
 
-    return levels
+    return lmonsters, wmonsters
 
 
 def parseargs(argv=None):
@@ -196,18 +211,27 @@ def main(argv=None):
                                  _myname,
                                  "%s_%s.json" % (_myname,
                                                  hashlib.md5(args.infile.name +
-                                                             str(os.path.getmtime(args.infile.name)) +
-                                                             "".join([str(float(_)) for _ in weights])
+                                                             str(os.path.getmtime(args.infile.name))
                                                              ).hexdigest()))
         try:
             with open(cachefile, 'r') as fp:
                 log.debug("Reading from cache file '%s'", cachefile)
                 data = json.load(fp)
-                levels   = {int(level): data for level, data in data['levels'].iteritems()}
+                lmonsters = data['lmonsters']
+                wmonsters = data['wmonsters']
         except IOError:
-            levels = read_data(args.infile, weights, cachefile)
+            lmonsters, wmonsters = read_data(args.infile, cachefile)
     else:
-        levels = read_data(args.infile, weights)
+        lmonsters, wmonsters = read_data(args.infile)
+
+    # Add weighted Wander and Level monsters to get Levels dictionary
+    levels = {level: [nl * weights[0] +
+                      nw * weights[1]
+                      for nl, nw in zip(ll, lw)]
+              for level, ((_, ll), (_, lw))
+              in enumerate(zip(sorted(lmonsters.iteritems(), key=lambda _: int(_[0])),
+                               sorted(wmonsters.iteritems(), key=lambda _: int(_[0]))),
+                           1)}
 
     # Normalize the data
     for level, data in levels.iteritems():
