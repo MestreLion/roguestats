@@ -140,15 +140,16 @@ def read_data(fp, cachefile=None):
                   monstersperline=monsters / lines,
                   totalmonsters=monsters)
 
+    data = dict(header=header,
+                lmonsters=lmonsters,
+                wmonsters=wmonsters,
+                monsters={"": list(MONSTERS)},
+                )
+
     # Save to cache
     if cachefile is not None:
         try:
             log.debug("Saving data to cache file '%s'", cachefile)
-            data = dict(header=header,
-                        lmonsters=lmonsters,
-                        wmonsters=wmonsters,
-                        monsters={"": list(MONSTERS)},
-                        )
             try:
                 os.makedirs(os.path.dirname(cachefile), 0700)
             except OSError as e:
@@ -163,7 +164,37 @@ def read_data(fp, cachefile=None):
         except IOError as e:
             log.warn("Could not write cache '%s': %s", cachefile, e)
 
-    return lmonsters, wmonsters
+    return data
+
+
+def normalize_data(data, weights):
+    ''' Convert lmonsters and wmonsters (from data dictionary) to
+        weighted, normalized levels and monsters dictionaries
+    '''
+
+    lmonsters = data['lmonsters']
+    wmonsters = data['wmonsters']
+
+    # Add weighted Wander and Level monsters to get Levels dictionary
+    levels = {level: [nl * weights[0] +
+                      nw * weights[1]
+                      for nl, nw in zip(ll, lw)]
+              for level, ((_, ll), (_, lw))
+              in enumerate(zip(sorted(lmonsters.iteritems(), key=lambda _: int(_[0])),
+                               sorted(wmonsters.iteritems(), key=lambda _: int(_[0]))),
+                           1)}
+
+    # Normalize the data
+    for level, data in levels.iteritems():
+        total = sum(data)
+        if total:
+            levels[level] = [100. * _ / total for _ in data]
+
+    # Transpose Levels to get Monsters
+    monsters = {monster: [_[m] for _ in levels.itervalues()]
+                for m, monster in enumerate(MONSTERS)}
+
+    return levels, monsters
 
 
 def parseargs(argv=None):
@@ -217,31 +248,12 @@ def main(argv=None):
             with open(cachefile, 'r') as fp:
                 log.debug("Reading from cache file '%s'", cachefile)
                 data = json.load(fp)
-                lmonsters = data['lmonsters']
-                wmonsters = data['wmonsters']
         except IOError:
-            lmonsters, wmonsters = read_data(args.infile, cachefile)
+            data = read_data(args.infile, cachefile)
     else:
-        lmonsters, wmonsters = read_data(args.infile)
+        data = read_data(args.infile)
 
-    # Add weighted Wander and Level monsters to get Levels dictionary
-    levels = {level: [nl * weights[0] +
-                      nw * weights[1]
-                      for nl, nw in zip(ll, lw)]
-              for level, ((_, ll), (_, lw))
-              in enumerate(zip(sorted(lmonsters.iteritems(), key=lambda _: int(_[0])),
-                               sorted(wmonsters.iteritems(), key=lambda _: int(_[0]))),
-                           1)}
-
-    # Normalize the data
-    for level, data in levels.iteritems():
-        total = sum(data)
-        if total:
-            levels[level] = [100. * _ / total for _ in data]
-
-    # Transpose Levels to get Monsters
-    monsters = {monster: [_[m] for _ in levels.itervalues()]
-                for m, monster in enumerate(MONSTERS)}
+    levels, monsters = normalize_data(data, weights)
 
     print "Main data: Monsters per Level, normalized as percentage of level"
     print pretty({"": list(MONSTERS)}, intlen=4)
