@@ -38,7 +38,7 @@ log = logging.getLogger(__name__)
 MONSTERS = string.ascii_uppercase
 
 
-def pretty(obj, indent=1, intlen=2, sortk=True, keylen=2, precision=1, simplelists=False, blankzeros=False, _lvl=0):
+def pretty(obj, indent=1, intlen=2, sortk=True, keylen=2, precision=1, simplelists=False, blankzeros=True, _lvl=0):
     '''Helper function to format lists and dictionaries'''
     sep = " " * indent
     kw = dict(indent=indent,
@@ -188,7 +188,7 @@ def load_data(infile, stdin):
         with open(cachefile, 'w') as fp:
             intlen = int(math.log10(max(sum(data["lmonsters"].values() +
                                             data["wmonsters"].values(), [])))) + 1
-            fp.write(pretty(data, intlen=intlen) + '\n')
+            fp.write(pretty(data, intlen=intlen, blankzeros=False) + '\n')
 
     except IOError as e:
         log.warn("Could not write cache '%s': %s", cachefile, e)
@@ -270,9 +270,12 @@ def main(argv=None):
     levels, monsters = normalize_data(data, weights)
 
     print "Main data: Monsters per Level, normalized as percentage of level"
+    print "By Level:"
     print pretty({"": list(MONSTERS)}, intlen=4)
-    print pretty(levels,   blankzeros=True)
-    print pretty(monsters, blankzeros=True)
+    print pretty(levels)
+    print "By Monster:"
+    print pretty({"": list(levels)}, intlen=4)
+    print pretty(monsters)
 
     ranges = {monster: monster_range(data) for monster, data in monsters.iteritems()}
 
