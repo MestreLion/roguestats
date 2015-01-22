@@ -294,15 +294,16 @@ def main(argv=None):
                                               if num > 0],
                                              reverse=True))[1])
                   for level, data in levels.iteritems()},
-                 simplelists=True)
+                 )
 
     print "Distribution in levels for each monster, sorted by most frequent level:"
     print pretty({monster: zip(*sorted([(num, level)
                                         for level, num in enumerate(data, 1)
                                         if num > 0],
                                        reverse=True))[1]
+                           if sum(data) > 0 else []
                   for monster, data in monsters.iteritems()},
-                 simplelists=True, keylen=1)
+                 keylen=1)
 
 
 
