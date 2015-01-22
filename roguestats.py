@@ -155,13 +155,13 @@ def load_data(infile, stdin):
     '''
 
     # Read cache file, if it exists and input is not <stdin>
-    cachefile = os.path.join(xdg_cache_home,
-                             _myname,
-                             "%s_%s.json" % (_myname,
-                                             hashlib.md5(infile.name +
-                                                         str(os.path.getmtime(infile.name))
-                                                         ).hexdigest()))
     if not stdin:
+        cachefile = os.path.join(xdg_cache_home,
+                                 _myname,
+                                 "%s_%s.json" % (_myname,
+                                                 hashlib.md5(infile.name +
+                                                             str(os.path.getmtime(infile.name))
+                                                             ).hexdigest()))
         try:
             with open(cachefile, 'r') as fp:
                 log.debug("Reading data from cache file '%s'", cachefile)
