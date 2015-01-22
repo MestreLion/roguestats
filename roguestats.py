@@ -148,14 +148,15 @@ def read_file(fp):
     return data
 
 
-def load_data(infile, stdin):
+def load_data(infile):
     ''' Load the data from cache file, if possible,
         or load from opened infile fp and save it to cache file.
         if infile is <stdin>, do not try to read or write cache
     '''
 
     # Read cache file, if it exists and input is not <stdin>
-    if not stdin:
+    cache = (infile.name != "<stdin>")  # not perfect detection, but good enough
+    if cache:
         cachefile = os.path.join(xdg_cache_home,
                                  _myname,
                                  "%s_%s.json" % (_myname,
@@ -173,7 +174,7 @@ def load_data(infile, stdin):
     # Cache failed. Read from input file
     log.debug("Reading data from '%s'", infile.name)
     data = read_file(infile)
-    if stdin:
+    if not cache:
         return data
 
     # Save to cache
@@ -252,7 +253,6 @@ def parseargs(argv=None):
                             "[Default: read from stdin]")
 
     args = parser.parse_args(argv)
-    args.stdin = (args.infile.name == "<stdin>")  # not perfect detection, but good enough
 
     return args
 
@@ -265,7 +265,7 @@ def main(argv=None):
     weights = (abs(args.level_weight),
                abs(args.wander_weight))
 
-    data = load_data(args.infile, args.stdin)
+    data = load_data(args.infile)
 
     levels, monsters = normalize_data(data, weights)
 
