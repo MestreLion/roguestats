@@ -3,16 +3,6 @@
 
 long *e_levels;		/* Pointer to array of experience level */
 
-/*
- * init_player:
- *	Roll up the rogue
- */
-init_player()
-{
-	bcopy(pstats,max_stats);
-
-	//@ followed by a series of add_pack() for initial inventory
-}
 
 /*
  * init_ds()
