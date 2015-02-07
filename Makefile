@@ -1,18 +1,18 @@
 # Perhaps one of the simplest Makefiles there is...
 
 CFLAGS=-Wall
-TARGET=roguemonsters
+TARGETS=roguemonsters xplevels
 
 .PHONY: all default clean run
 
 all: default
 
-default: $(TARGET)
+default: $(TARGETS)
 
-$(TARGET):
+$(TARGETS):
 
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGETS)
 
 run: $(TARGET)
-	./$(TARGET)
+	./$(TARGETS)
